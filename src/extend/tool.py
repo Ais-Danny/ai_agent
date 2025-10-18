@@ -1,11 +1,8 @@
-import os
+import os,subprocess
 from langchain_core.tools import tool
 
-from langgraph.checkpoint.memory import InMemorySaver
-memory = InMemorySaver()
-
 from langchain_experimental.tools import PythonREPLTool
-from langchain.tools import ShellTool
+from langchain_community.tools import ShellTool
 
 
 # ----------------- 工具 -----------------
@@ -34,3 +31,16 @@ def write_file(file_path: str, content: str) -> str:
         return f"文件已写入成功: {file_path}"
     except Exception as e:
         return f"错误: {e}"
+    
+@tool
+def run_cmd(command: str) -> str:
+    """
+    执行 Windows cmd 命令，并返回输出
+    """
+    try:
+        # 执行命令
+        result = subprocess.run(command, shell=True, capture_output=True, text=True)
+        # 返回标准输出和错误输出
+        return result.stdout + result.stderr
+    except Exception as e:
+        return str(e)

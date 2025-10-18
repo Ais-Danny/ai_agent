@@ -45,6 +45,6 @@ class LangSmith_Config:
     LANGCHAIN_PROJECT: str = "agent_project"
     LANGCHAIN_API_KEY: str = "" #你在 LangSmith  Key
     def init_env(self):
-        os.environ["LANGCHAIN_TRACING_V2"] = self.LANGCHAIN_TRACING_V2
+        os.environ["LANGCHAIN_TRACING_V2"] = self.LANGCHAIN_TRACING_V2.lower()
         os.environ["LANGCHAIN_PROJECT"] = self.LANGCHAIN_PROJECT
         os.environ["LANGCHAIN_API_KEY"] = self.LANGCHAIN_API_KEY

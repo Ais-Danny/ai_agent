@@ -1,10 +1,10 @@
 from typing import List, Dict, Callable
 from langgraph.prebuilt import create_react_agent
-from langgraph.checkpoint.memory import MemorySaver
+from src.extend.openai.summarizing_memory import HistoryMemory
 from src.config.config_entity import LLM_Model
 
 class Langgraph_Agent:
-    memory: MemorySaver
+    memory: HistoryMemory
     system_prompt: str = None
 
     def __init__(self, model: LLM_Model, tools: List = [], system_prompt: str = None):
@@ -15,15 +15,14 @@ class Langgraph_Agent:
         self.model = model.init_model()  # LangChain ChatModel
         self.tools: List = tools[:]  # 工具列表可动态修改
         self.system_prompt = system_prompt
-        self.memory = MemorySaver()
+        self.memory = HistoryMemory()
         self._init_graph()
 
     def _init_graph(self):
         """初始化或刷新 graph 对象"""
         self.graph = create_react_agent(
             model=self.model,
-            tools=self.tools,
-            checkpointer=self.memory
+            tools=self.tools
         )
 
     # --- 工具管理方法 ---
@@ -51,9 +50,14 @@ class Langgraph_Agent:
         messages_for_graph = []
         if self.system_prompt:
             messages_for_graph.append(("system", self.system_prompt))
+        history_messages = self.memory.get_history(thread_id)#获取历史消息
+        if history_messages:
+            messages_for_graph.extend(history_messages)
         messages_for_graph.append(("user", user_input))
-        config = {"configurable": {"thread_id": thread_id}}
-        result = self.graph.invoke({"messages": messages_for_graph}, config)
+
+        self.memory.add_message(thread_id, "user", user_input)#添加用户消息到历史消息
+        result = self.graph.invoke({"messages": messages_for_graph})
+        self.memory.add_message(thread_id,"assistant", self.get_last_response(result))#添加系统消息到历史消息
         return result
 
     def get_last_response(self, result: Dict) -> str:
