@@ -18,6 +18,7 @@ model: dev # 启用的环境
 configs:
 - name: dev  # 环境名称
   max_token_limit: 2048 # 历史会话大小达到该值时进行摘要处理以节省token消耗
+  max_steps: 10 # 最大递归次数(单次回答)
   llm_model: # 语言模型配置
     model_name: deepseek-v3.1:671b-cloud # 模型名称
     model_provider: ollama # api 格式(ollama/openai)
@@ -40,4 +41,16 @@ configs:
     user: root
     password: root
     database: agent_db
+
+```
+
+### prompt(模板设定)
+在代码文件 src/prompt.py 中进行配置
+
+例：
+``` python
+#摘要prompt
+summary_prompt = "帮我总结一下历史会话,尽量简短,不超过2048字节。"
+#系统prompt
+system_prompt = "你是一个Agent智能体,能够调用种工具函数,请在回答前检查是否可以调用MCP函数。"
 ```

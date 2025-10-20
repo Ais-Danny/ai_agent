@@ -1,58 +1,44 @@
-# pip install langchain langgraph openai pyautogui
-from langchain_openai import ChatOpenAI
-from langchain_ollama import ChatOllama
+from colorama import Fore, Style, init
 
-from langgraph.graph import StateGraph,START, END
-from langchain_core.messages import ToolMessage
-from typing import TypedDict,Annotated
-from langgraph.graph.message import add_messages
-from IPython.display import Image, display
-from langchain_core.tools import tool
-import pyautogui
-
-@tool
-def add(a: int, b: int) -> int:
-    """Adds a and b."""
-    return a + b
+from src.config.config_model import config
+from src.entity.agent.langgraph_agent import Langgraph_Agent
+from src.prompt import system_prompt
+from src.extend.tool import list_files,read_file,write_file,run_cmd
+from src.utils import print_watermark
 
 
-@tool
-def multiply(a: int, b: int) -> int:
-    """Multiplies a and b."""
-    return a * b
+config.langsmith_config.init_env() # 初始化环境变量
+agent=Langgraph_Agent(config.llm_model,tools=[list_files,read_file,write_file,run_cmd],system_prompt=system_prompt)
 
-tools = [add, multiply]
 
-# 1. 定义大模型
-llm = ChatOllama(
-    model="deepseek-v3.1:671b-cloud",  # 或 "gpt-3.5-turbo"
-    temperature=0,
-    api_key="YOUR_OPENAI_API_KEY",
-)
-llm_with_tools = llm.bind_tools(tools)
+# agent.memory.load("1") #加载历史会话
+# print("myself:", agent.memory.get_history("1"))
+# res = agent.invoke(r"在D:\Desktop创建一个对langchain框架的介绍文档",stream_func=print)
+# print("ai_agent:", res)
+# agent.memory.save("1") #保存历史会话(默认不保存)
 
-# 定义状态模型
-class State(TypedDict):
-    messages: Annotated[list, add_messages]
 
-# 定义节点函数
-def chatbot(state: State):
-    return {"messages": [llm_with_tools.invoke(state["messages"])]}
+def stream_func(role:str, content:str):
+    """
+    根据角色打印不同颜色
+    """
+    role_lower = role.lower()
+    if role_lower in {"ai", "assistant"}:
+        color = Fore.CYAN  # AI 输出青色
+    elif role_lower == "tool":
+        color = Fore.YELLOW  # 工具输出黄色
+    elif role_lower == "error":
+        color = Fore.RED
+    else:
+        color = Fore.WHITE  # 其他角色默认白色
+    print(color + f"{role}: {content}")
 
-# 创建图形
-graph_builder = StateGraph(State)
-graph_builder.add_node("chatbot", chatbot)
-graph_builder.add_edge(START,"chatbot")
-graph_builder.add_edge("chatbot",END)
-
-# 编译图形
-graph = graph_builder.compile()
-
-try:
-    png_bytes = graph.get_graph().draw_mermaid_png()
-    with open("graph.png", "wb") as f:
-        f.write(png_bytes)
-except Exception :
-    # This requires some extra dependencies and is optional
-    pass
-
+while True:
+    user_input = input("myself: ").strip()
+    if user_input.lower() in {"exit", "quit"}:
+        print("🔚 结束对话")
+        break
+    # 调用 agent.invoke 并实时打印迭代信息
+    res = agent.invoke(user_input, thread_id="1", stream_func=stream_func)  # 假设你 invoke 支持 stream_func
+    # 保存历史
+    agent.memory.save("1")

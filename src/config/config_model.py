@@ -14,6 +14,7 @@ from src.config.config_entity import LLM_Model, MySQL_Config,LangSmith_Config
 class Project:
     name:str = 'dev'
     max_token_limit: int = 4096 #会话记忆最大长度(超出会自动生成摘要)
+    max_steps: int = 10 #迭代次数限制(单次回答)
     llm_model: LLM_Model = field(default_factory=LLM_Model) #语言模型(生产力模型)
     summary_model: LLM_Model = field(default_factory=LLM_Model) #摘要模型(推荐使用本地小模型进行摘要)
     langsmith_config: LangSmith_Config = field(default_factory=LangSmith_Config) #LangSmith配置(监控模型指标)

@@ -1,10 +1,6 @@
 import os,subprocess
 from langchain_core.tools import tool
 
-from langchain_experimental.tools import PythonREPLTool
-from langchain_community.tools import ShellTool
-
-
 # ----------------- 工具 -----------------
 @tool
 def list_files(directory: str) -> str:

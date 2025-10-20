@@ -1,7 +1,11 @@
 from typing import List, Dict, Callable
 from langgraph.prebuilt import create_react_agent
+from langgraph.errors import GraphRecursionError
+
 from src.extend.openai.summarizing_memory import HistoryMemory
 from src.config.config_entity import LLM_Model
+from src.extend.openai.openai_message import OpenAIMessage
+from src.config.config_model import config
 
 class Langgraph_Agent:
     memory: HistoryMemory
@@ -11,6 +15,7 @@ class Langgraph_Agent:
         """
         model: LLM_Model 对象，需要有 init_model() 方法返回 LangChain ChatModel
         tools: 初始工具列表
+        system_prompt: llm模型系统提示信息
         """
         self.model = model.init_model()  # LangChain ChatModel
         self.tools: List = tools[:]  # 工具列表可动态修改
@@ -45,26 +50,60 @@ class Langgraph_Agent:
         """返回当前工具列表名称"""
         return [getattr(t, "__name__", str(t)) for t in self.tools]
 
-    # --- 核心功能 ---
-    def invoke(self, user_input: str, thread_id: str = "1"):
+    def invoke(self, user_input: str, thread_id: str = "1",max_steps:int=None,stream_func: callable = None)->OpenAIMessage:
+        """
+        user_input: 提问内容
+        thread_id:  会话id
+        max_steps:  最大递归次数
+        stream_func: 在流式调用时的回调函数(可用于打印递归过程)
+        """
+        if max_steps is None:
+            max_steps =config.max_steps
         messages_for_graph = []
         if self.system_prompt:
             messages_for_graph.append(("system", self.system_prompt))
         history_messages = self.memory.get_history(thread_id)#获取历史消息
         history_len=1 #历史消息索引(起始索引，system消息默认占一条)
         if history_messages:
-            history_len=len(history_messages) #历史消息索引(起始索引，system消息默认占一条)
+            history_len=len(history_messages)-1 #历史消息索引(起始索引，system消息默认占一条)
             messages_for_graph.extend(history_messages)
         messages_for_graph.append(("user", user_input))
 
         self.memory.add_message(thread_id, "user", user_input)#添加用户消息到历史消息
-        result = self.graph.invoke({"messages": messages_for_graph})
-        self.memory.add_message(thread_id,"assistant", self.get_last_response(result))#添加系统消息到历史消息
-        return result
+        try:
+            # result = self.graph.invoke(
+            #     {"messages": messages_for_graph},
+            #     config={"recursion_limit": max_steps},
+            # )
+            # all_messages = OpenAIMessage(result['messages'],history_len)
+            # self.memory.add_message(thread_id,"assistant", all_messages.last_message)#添加系统消息到历史消息
 
-    def get_last_response(self, result: Dict) -> str:
-        """获取最后一次 LLM 响应文本"""
-        return result["messages"][-1].content if "messages" in result else None
+            events = self.graph.stream(
+                {"messages": messages_for_graph},
+                config={"recursion_limit": max_steps},
+                stream_mode="values"
+            )
+            last_result = None
+            for event in events:
+                # event 就是一次迭代的结果
+                msg = event["messages"][-1]
+                # msg 可能是对象或 dict
+                role = getattr(msg, "role", getattr(msg, "type", "unknown"))
+                content = getattr(msg, "content", str(msg))
+                if stream_func and last_result: #跳过第一条打印
+                    stream_func(role,content)  # 即时输出
+                last_result = event
+
+            all_messages = OpenAIMessage(last_result['messages'], history_len)
+            self.memory.add_message(thread_id, "assistant", all_messages.last_message)
+        except GraphRecursionError:
+            all_messages = OpenAIMessage().set_error("超过最大递归次数限制：{max_steps} 次")
+            stream_func("error",all_messages) 
+        except Exception as e:
+            all_messages = OpenAIMessage().set_error(str(e))
+            stream_func("error",all_messages)
+        return all_messages
+
 
     def draw_graph(self, filename: str = "graph.png") -> str:
         """保存决策图"""
