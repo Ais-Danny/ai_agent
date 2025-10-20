@@ -2,7 +2,7 @@ model: dev # 启用的环境
 configs:
 - name: dev  # 环境名称
   max_token_limit: 2048 # 历史会话大小达到该值时进行摘要处理以节省token消耗
-  max_steps: 10 # 最大递归次数(单次回答)
+  max_steps: 25 # 最大递归次数(单次回答)
   llm_model: # 语言模型配置
     model_name: deepseek-v3.1:671b-cloud # 模型名称
     model_provider: ollama # api 格式(ollama/openai)

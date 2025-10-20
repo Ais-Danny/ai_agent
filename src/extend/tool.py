@@ -31,12 +31,20 @@ def write_file(file_path: str, content: str) -> str:
 @tool
 def run_cmd(command: str) -> str:
     """
-    执行 Windows cmd 命令，并返回输出
+    执行 Windows cmd 命令，并返回输出。
     """
     try:
         # 执行命令
         result = subprocess.run(command, shell=True, capture_output=True, text=True)
-        # 返回标准输出和错误输出
-        return result.stdout + result.stderr
+
+        # 拼接 stdout 和 stderr
+        output = (result.stdout or "").strip() + (result.stderr or "").strip()
+
+        # 如果内容为空，返回提示
+        if not output:
+            return f"命令已执行成功，但没有输出: {command}"
+        
+        return output
+
     except Exception as e:
-        return str(e)
+        return f"命令执行异常: {str(e)}"
