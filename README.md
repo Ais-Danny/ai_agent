@@ -36,7 +36,7 @@ configs:
     LANGCHAIN_PROJECT: agent_project # 项目名称
     LANGCHAIN_API_KEY: '' # LangSmith api_key
   mysql: # mysql配置(预留暂未启用)
-    host: git.aisdanny.top
+    host: 192.168.3.26
     port: 3306
     user: root
     password: root
