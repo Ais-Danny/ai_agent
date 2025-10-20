@@ -51,7 +51,9 @@ class Langgraph_Agent:
         if self.system_prompt:
             messages_for_graph.append(("system", self.system_prompt))
         history_messages = self.memory.get_history(thread_id)#获取历史消息
+        history_len=1 #历史消息索引(起始索引，system消息默认占一条)
         if history_messages:
+            history_len=len(history_messages) #历史消息索引(起始索引，system消息默认占一条)
             messages_for_graph.extend(history_messages)
         messages_for_graph.append(("user", user_input))
 

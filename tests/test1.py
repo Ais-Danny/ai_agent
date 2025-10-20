@@ -34,8 +34,7 @@ agent=Langgraph_Agent(config.llm_model,tools=[list_files,read_file,write_file,ru
 
 
 
-# agent.memory.load("1")
-res = agent.invoke("在桌面创建一个对langchain框架的介绍文档")
+agent.memory.load("1")
+res = agent.invoke(r"在D:\Desktop创建一个对langchain框架的介绍文档")
 print("ai_agent:", agent.get_last_response(res))
-
-# agent.memory.save("1")
+agent.memory.save("1")
