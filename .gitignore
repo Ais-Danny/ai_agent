@@ -4,3 +4,4 @@
 config.yaml
 data
 .github
+node_modules

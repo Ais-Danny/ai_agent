@@ -19,39 +19,249 @@ document.addEventListener('click', function(e) {
     }
 });
 
+// 创建自定义模态对话框元素
+function createRenameDialog() {
+    const dialogHTML = `
+    <div id="rename-dialog" class="custom-dialog" style="display:none;">
+        <div class="dialog-overlay"></div>
+        <div class="dialog-content">
+            <div class="dialog-header">
+                <h3>重命名会话</h3>
+            </div>
+            <div class="dialog-body">
+                <input type="text" id="new-session-name" class="dialog-input" placeholder="请输入新的会话名称">
+            </div>
+            <div class="dialog-footer">
+                <button id="dialog-cancel" class="dialog-btn cancel">取消</button>
+                <button id="dialog-confirm" class="dialog-btn confirm">确认</button>
+            </div>
+        </div>
+    </div>
+    `;
+    
+    // 添加样式
+    const styleHTML = `
+    <style>
+    .custom-dialog {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 1000;
+        display: flex;
+        justify-content: center;
+        align-items: flex-start;
+        overflow-y: auto;
+        padding: 20px;
+        box-sizing: border-box;
+    }
+    .dialog-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.5);
+    }
+    .dialog-content {
+        position: relative;
+        background-color: white;
+        border-radius: 8px;
+        padding: 0;
+        width: 100%;
+        max-width: 400px;
+        min-width: 300px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        margin: auto;
+        top: 20vh;
+        box-sizing: border-box;
+    }
+    .dialog-header {
+        padding: 15px 20px;
+        border-bottom: 1px solid #eee;
+    }
+    .dialog-header h3 {
+        margin: 0;
+        font-size: 16px;
+        color: #333;
+    }
+    .dialog-body {
+        padding: 20px;
+    }
+    .dialog-input {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 14px;
+        outline: none;
+        box-sizing: border-box;
+    }
+    .dialog-input:focus {
+        border-color: #3498db;
+    }
+    .dialog-footer {
+        padding: 15px 20px;
+        border-top: 1px solid #eee;
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+    }
+    .dialog-btn {
+        padding: 8px 16px;
+        border: none;
+        border-radius: 4px;
+        font-size: 14px;
+        cursor: pointer;
+        transition: background-color 0.3s;
+    }
+    .dialog-btn.cancel {
+        background-color: #f5f5f5;
+        color: #333;
+    }
+    .dialog-btn.cancel:hover {
+        background-color: #e0e0e0;
+    }
+    .dialog-btn.confirm {
+        background-color: #3498db;
+        color: white;
+    }
+    .dialog-btn.confirm:hover {
+        background-color: #2980b9;
+    }
+    </style>
+    `;
+    
+    // 添加到文档
+    document.head.insertAdjacentHTML('beforeend', styleHTML);
+    document.body.insertAdjacentHTML('beforeend', dialogHTML);
+}
+
+// 初始化自定义对话框
+if (!document.getElementById('rename-dialog')) {
+    createRenameDialog();
+}
+
 // 会话重命名
 document.addEventListener('click', function(e) {
     if (e.target.classList.contains('rename-btn')) {
         e.stopPropagation(); // 阻止事件冒泡，避免触发会话切换
         const sessionId = e.target.getAttribute('data-id');
-        const newName = prompt('请输入新的会话名称:', sessionId);
+        const sessionElement = e.target.closest('.session-item');
         
-        if (newName && newName.trim() && newName !== sessionId) {
-            fetch('/rename_session', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded'
-                },
-                body: `old_name=${encodeURIComponent(sessionId)}&new_name=${encodeURIComponent(newName.trim())}`
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    // 更新界面上的会话名称
-                    const sessionItem = e.target.closest('.session-item');
-                    if (sessionItem) {
-                        const sessionIdElement = sessionItem.querySelector('.session-id');
-                        if (sessionIdElement) {
-                            sessionIdElement.textContent = newName.trim();
+        // 显示自定义对话框
+        const dialog = document.getElementById('rename-dialog');
+        const input = document.getElementById('new-session-name');
+        const confirmBtn = document.getElementById('dialog-confirm');
+        const cancelBtn = document.getElementById('dialog-cancel');
+        
+        // 移除可能存在的旧事件监听器（避免连续点击时的问题）
+        const newConfirmBtn = confirmBtn.cloneNode(true);
+        const newCancelBtn = cancelBtn.cloneNode(true);
+        confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
+        cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn);
+        
+        // 更新引用
+        const updatedConfirmBtn = document.getElementById('dialog-confirm');
+        const updatedCancelBtn = document.getElementById('dialog-cancel');
+        
+        // 设置初始值
+        input.value = sessionId;
+        
+        // 确保对话框在可视区域内
+        updateDialogPosition();
+        
+        // 显示对话框
+        dialog.style.display = 'flex';
+        // 聚焦输入框
+        setTimeout(() => {
+            input.focus();
+            input.select();
+        }, 100);
+        
+        // 确认按钮点击事件
+        const handleConfirm = function() {
+            const newName = input.value.trim();
+            
+            if (newName && newName !== sessionId) {
+                fetch('/rename_session', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    },
+                    body: `old_name=${encodeURIComponent(sessionId)}&new_name=${encodeURIComponent(newName)}`
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // 更新界面上的会话名称
+                        if (sessionElement) {
+                            const sessionIdElement = sessionElement.querySelector('.session-id');
+                            if (sessionIdElement) {
+                                sessionIdElement.textContent = newName;
+                            }
                         }
+                    } else {
+                        // 显示错误信息
+                        alert(data.message || '重命名失败');
                     }
-                } else {
-                    alert(data.message);
-                }
-            })
-            .catch(error => {
-                alert('重命名失败');
-            });
+                })
+                .catch(error => {
+                    alert('重命名失败');
+                })
+                .finally(() => {
+                    closeDialog();
+                });
+            } else {
+                closeDialog();
+            }
+        };
+        
+        // 取消按钮点击事件
+        const handleCancel = function() {
+            closeDialog();
+        };
+        
+        // 关闭对话框并清理事件监听器
+        const closeDialog = function() {
+            dialog.style.display = 'none';
+            document.removeEventListener('keydown', handleEsc);
+        };
+        
+        // ESC键关闭对话框
+        const handleEsc = function(event) {
+            if (event.key === 'Escape') {
+                closeDialog();
+            }
+        };
+        
+        // 添加事件监听器
+        updatedConfirmBtn.addEventListener('click', handleConfirm);
+        updatedCancelBtn.addEventListener('click', handleCancel);
+        document.addEventListener('keydown', handleEsc);
+        
+        // 确保对话框在窗口大小改变时仍然可见
+        window.addEventListener('resize', updateDialogPosition);
+        
+        // 确保对话框在可视区域内
+        function updateDialogPosition() {
+            const dialogContent = dialog.querySelector('.dialog-content');
+            const windowHeight = window.innerHeight;
+            const dialogHeight = dialogContent.offsetHeight;
+            
+            // 确保对话框不超出视口
+            if (dialogHeight > windowHeight - 40) {
+                dialogContent.style.maxHeight = (windowHeight - 40) + 'px';
+                dialogContent.style.overflowY = 'auto';
+            } else {
+                dialogContent.style.maxHeight = 'none';
+                dialogContent.style.overflowY = 'visible';
+            }
+            
+            // 设置顶部位置，确保在可视区域内
+            const topPosition = Math.max(20, (windowHeight - dialogHeight) / 2);
+            dialogContent.style.top = topPosition + 'px';
         }
     }
 });

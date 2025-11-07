@@ -168,23 +168,29 @@ body {
     background-color: #f8f9fa;
     display: flex;
     flex-direction: column;
+    position: relative;
+    overflow: hidden;
 }
 
 .chat-history {
     flex: 1;
     padding: 20px;
+    padding-bottom: 100px; /* 增加底部空间，确保输入框不会遮挡消息 */
     overflow-y: auto;
     display: flex;
     flex-direction: column;
     gap: 15px;
+    position: relative;
+    z-index: 1;
 }
 
 .message {
     max-width: 80%;
-    padding: 15px;
+    padding: 15px 15px 15px 50px; /* 为左侧历史控制按钮预留空间 */
     border-radius: 8px;
     position: relative;
     word-wrap: break-word;
+    margin-bottom: 10px;
 }
 
 .message.user {
@@ -216,11 +222,18 @@ body {
 
 /* 聊天输入框 */
 .chat-input {
-    padding: 15px;
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 15px 20px;
     background-color: white;
     border-top: 1px solid #ddd;
     display: flex;
     gap: 10px;
+    z-index: 100; /* 确保在内容之上 */
+    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.05); /* 添加轻微阴影增加层次感 */
+    margin: 0;
 }
 
 #message-input {
@@ -354,6 +367,7 @@ body {
     left: 10px;
     opacity: 0;
     transition: opacity 0.3s;
+    z-index: 50; /* 确保按钮在消息内容之上但在输入框之下 */
 }
 
 .message:hover .history-control {
