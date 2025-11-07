@@ -16,7 +16,7 @@
             "name": "AI Agent: web模式",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/main.py",
+            "program": "${workspaceFolder}/run_web.py",
             "cwd": "${workspaceFolder}",
             "console": "integratedTerminal",
         }

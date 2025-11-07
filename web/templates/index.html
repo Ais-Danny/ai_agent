@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 智能体对话系统</title>
+    <!-- 引入外部库 -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/highlight.js/lib/core.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/highlight.js/lib/languages/python.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js/styles/atom-one-dark.min.css">
+    <!-- 引入自定义样式 -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>AI 智能体对话系统</h1>
+            <div class="actions">
+                <button id="save-btn">保存会话</button>
+                <button id="new-btn">新建会话</button>
+            </div>
+        </header>
+        
+        <aside class="sidebar">
+            <h3>会话列表</h3>
+            <ul class="session-list">
+                {% for sess in sessions %}
+                <li class="session-item {{ 'active' if sess == current_session else '' }}">
+                    <div class="session-info">
+                        <span class="session-id">{{ sess }}</span>
+                        <span class="time">{{ '当前' if sess == current_session else '' }}</span>
+                    </div>
+                    <div class="session-actions">
+                        <button class="rename-btn" data-id="{{ sess }}">重命名</button>
+                        {% if sess != current_session %}
+                        <button class="delete-btn" data-id="{{ sess }}">删除</button>
+                        {% endif %}
+                    </div>
+                </li>
+                {% endfor %}
+            </ul>
+        </aside>
+        
+        <main class="chat-container">
+            <div class="chat-history" id="chat-history">
+                {% for role, content in history %}
+                <div class="message {{ role }}">
+                    <div class="history-control">
+                        <button class="continue-button" data-index="{{ loop.index0 }}">从此处继续</button>
+                    </div>
+                    {% if role == 'assistant' %}
+                    <div class="message-content markdown-content">{{ content }}</div>
+                    {% else %}
+                    <div class="message-content">{{ content }}</div>
+                    {% endif %}
+                </div>
+                {% else %}
+                <div class="message system">欢迎使用AI智能体对话系统，请输入您的问题...</div>
+                {% endfor %}
+            </div>
+            
+            <form class="chat-input" id="chat-form">
+                <input type="text" id="message-input" placeholder="请输入您的问题..." autocomplete="off">
+                <button type="submit">发送</button>
+            </form>
+        </main>
+        
+        <aside class="recursion-container">
+            <div class="recursion-header">
+                <h3>递归调用过程</h3>
+                <button id="clear-logs">清空日志</button>
+            </div>
+            <div class="recursion-logs" id="recursion-logs">
+                {% if recursion_logs %}
+                {% for log in recursion_logs %}
+                <div class="recursion-log {{ log.level }}">
+                    <div class="timestamp">{{ log.timestamp }}</div>
+                    <div class="function">{{ log.level }} - {{ log.function }}</div>
+                    {% if log.params %}
+                    <div class="params">参数: {{ log.params | tojson }}</div>
+                    {% endif %}
+                    {% if log.result %}
+                    <div class="result">结果: {{ log.result | tojson }}</div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+                {% else %}
+                <div style="text-align: center; color: #999; padding: 20px;">暂无递归调用记录</div>
+                {% endif %}
+            </div>
+        </aside>
+        
+        <footer class="footer">
+            <p>AI智能体对话系统 &copy; 2024</p>
+        </footer>
+    </div>
+    
+    <!-- 引入自定义脚本 -->
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>

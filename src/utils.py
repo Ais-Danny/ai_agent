@@ -12,5 +12,3 @@ def print_watermark():
     print(Fore.BLUE + Style.BRIGHT + "Powered by: https://github.com/Ais-Danny/ai_agent.git")
     print(Fore.BLUE + "Version: V1.0.0.1")
     print(Fore.MAGENTA + "="*60)
-
-print_watermark()
