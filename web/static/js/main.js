@@ -16,6 +16,14 @@ document.addEventListener('click', function(e) {
         form.appendChild(input);
         document.body.appendChild(form);
         form.submit();
+        
+        // 确保页面有足够时间加载后滚动到底部
+        setTimeout(() => {
+            const chatHistory = document.getElementById('chat-history');
+            if (chatHistory) {
+                chatHistory.scrollTop = chatHistory.scrollHeight;
+            }
+        }, 500);
     }
 });
 
@@ -436,6 +444,14 @@ document.addEventListener('click', function(e) {
         form.appendChild(input);
         document.body.appendChild(form);
         form.submit();
+        
+        // 确保页面有足够时间加载后滚动到底部
+        setTimeout(() => {
+            const chatHistory = document.getElementById('chat-history');
+            if (chatHistory) {
+                chatHistory.scrollTop = chatHistory.scrollHeight;
+            }
+        }, 500);
     }
 });
 
@@ -447,26 +463,116 @@ document.getElementById('clear-logs').addEventListener('click', function() {
 
 // 更新递归日志
 function updateRecursionLogs() {
+    console.log("开始更新递归日志");
     fetch('/get_recursion_logs')
-        .then(response => response.json())
-        .then(logs => {
+        .then(response => {
+            console.log("递归日志请求响应状态:", response.status);
+            return response.json();
+        })
+        .then(data => {
+            console.log("获取到递归日志数据:", JSON.stringify(data));
             const logsContainer = document.getElementById('recursion-logs');
+            
+            if (!logsContainer) {
+                console.error("无法找到递归日志容器元素");
+                return;
+            }
+            
+            // 适配可能的不同数据结构
+            const logs = Array.isArray(data) ? data : (data.logs || []);
+            
+            // 只有当日志数量或内容发生变化时才更新
+            const currentLogsCount = logsContainer.querySelectorAll('.recursion-log').length;
+            if (currentLogsCount === logs.length && logs.length > 0) {
+                // 检查内容是否相同
+                const firstLogElement = logsContainer.querySelector('.recursion-log:first-child .timestamp');
+                const firstLogData = logs[0];
+                
+                if (firstLogElement && firstLogData && firstLogElement.textContent === firstLogData.timestamp) {
+                    // 日志内容没有变化，不更新DOM
+                    return;
+                }
+            }
+            
+            logsContainer.innerHTML = '';
+            
             if (logs.length > 0) {
-                logsContainer.innerHTML = '';
+                console.log(`发现 ${logs.length} 条递归日志记录`);
                 logs.forEach(log => {
                     const logElement = document.createElement('div');
-                    logElement.className = `recursion-log ${log.level}`;
+                    
+                    // 添加日志级别类和工具调用标识
+                    let className = `recursion-log ${log.level || ''}`;
+                    if (log.tool_name) {
+                        className += ' tool-call';
+                    }
+                    
+                    // 添加来源类名（与index.html中的getSourceClassName保持一致）
+                    if (log.source) {
+                        const sourceClass = getSourceClassName(log.source);
+                        className += ` source-${sourceClass}`;
+                        logElement.setAttribute('data-source', log.source);
+                    }
+                    
+                    logElement.className = className;
+                    
+                    // 使用合适的字段名
+                    const functionName = log.function_name || log.function || '未知函数';
+                    const timestamp = log.timestamp || new Date().toLocaleTimeString();
+                    
+                    // 为工具调用添加特殊样式和标识
+                    const isToolCall = log.level && log.level.startsWith('TOOL_');
+                    const toolPrefix = isToolCall ? '<span class="tool-indicator">🔧 </span>' : '';
+                    
                     logElement.innerHTML = `
-                        <div class="timestamp">${log.timestamp}</div>
-                        <div class="function">${log.level} - ${log.function}</div>
-                        ${log.params ? `<div class="params">参数: ${JSON.stringify(log.params)}</div>` : ''}
-                        ${log.result ? `<div class="result">结果: ${JSON.stringify(log.result)}</div>` : ''}
+                        <div class="timestamp">${timestamp}</div>
+                        <div class="function">${toolPrefix}${log.level || '未知'} - ${functionName}${log.tool_name ? ` (工具: ${log.tool_name})` : ''}</div>
+                        ${log.params ? `<div class="params">参数: ${typeof log.params === 'string' ? log.params : JSON.stringify(log.params)}</div>` : ''}
+                        ${log.result ? `<div class="result">结果: ${typeof log.result === 'string' ? log.result : JSON.stringify(log.result)}</div>` : ''}
+                        ${log.source ? `<div class="source">来源: ${log.source}</div>` : ''}
                     `;
+                    
                     logsContainer.appendChild(logElement);
                 });
                 logsContainer.scrollTop = logsContainer.scrollHeight;
+            } else {
+                console.log("没有递归日志记录，显示默认提示");
+                logsContainer.innerHTML = '<div class="no-logs-message">暂无递归调用记录</div>';
+            }
+        })
+        .catch(error => {
+            console.error('获取递归日志时出错:', error);
+            const logsContainer = document.getElementById('recursion-logs');
+            if (logsContainer) {
+                logsContainer.innerHTML = '<div class="error-message">加载递归日志时出错</div>';
             }
         });
+}
+
+// 从index.html复制的getSourceClassName函数，确保一致性
+function getSourceClassName(source) {
+    if (!source) return 'Default';
+    
+    // 预定义的来源类型映射到CSS类名
+    const sourceMap = {
+        'Agent': 'Agent',
+        'Tool': 'Tool',
+        'LLM': 'LLM',
+        'Database': 'Database',
+        'User': 'User',
+        'Assistant': 'Assistant'
+    };
+    
+    // 检查是否是预定义的来源类型
+    for (const [key, value] of Object.entries(sourceMap)) {
+        if (source.includes(key) || key.includes(source)) {
+            return value;
+        }
+    }
+    
+    // 如果来源名称包含类名，提取类名（去除可能的模块前缀）
+    const className = source.split('.').pop();
+    return sourceMap[className] || 'Default';
 }
 
 // HTML转义函数
@@ -498,6 +604,89 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // 自动滚动到底部
 window.addEventListener('load', function() {
+    console.log('页面加载完成，准备初始化聊天功能');
+    
     const chatHistory = document.getElementById('chat-history');
     chatHistory.scrollTop = chatHistory.scrollHeight;
+    
+    // 会话测试函数 - 用于验证会话功能是否正常响应
+    function testChatResponse() {
+        console.log('testChatResponse函数被调用');
+        
+        // 检查URL参数是否包含test=true
+        const urlParams = new URLSearchParams(window.location.search);
+        const testMode = urlParams.get('test') === 'true';
+        
+        console.log('检测到URL参数 test=' + testMode);
+        
+        if (testMode) {
+            console.log('进入测试模式，准备发送测试消息');
+            
+            // 等待一段时间确保DOM完全加载
+            setTimeout(function() {
+                console.log('尝试查找聊天元素...');
+                
+                const testMessage = '测试会话响应';
+                
+                // 查找聊天输入框
+                const messageInput = document.getElementById('message-input');
+                if (!messageInput) {
+                    console.error('未找到消息输入框');
+                    return;
+                }
+                
+                console.log('找到消息输入框，准备填充测试消息');
+                
+                messageInput.value = testMessage;
+                console.log('测试消息已填充');
+                
+                // 提交表单
+                const chatForm = document.getElementById('chat-form');
+                if (chatForm) {
+                    console.log('找到聊天表单，准备提交');
+                    chatForm.dispatchEvent(new Event('submit', {cancelable: true}));
+                    console.log('测试消息已提交');
+                } else {
+                    console.error('未找到聊天表单');
+                }
+            }, 1000);
+        }
+    }
+    
+    // 暴露测试函数到全局，便于手动调用
+    window.testChatResponse = testChatResponse;
+    console.log('测试函数已暴露到全局window对象');
+    
+    // 立即更新递归日志
+    console.log("首次更新递归日志");
+    updateRecursionLogs();
+    
+    // 移除固定的定时器，改为在消息发送和页面活动时更新
+    console.log("移除固定定时器，改用事件触发更新");
+    
+    // 在消息发送后更新日志
+    document.getElementById('chat-form').addEventListener('submit', function() {
+        setTimeout(updateRecursionLogs, 1000); // 延迟1秒以确保后端有足够时间生成日志
+    });
+    
+    // 在获取到响应后更新日志
+    // 注意：这里不需要额外添加，因为在发送消息的fetch回调中已经有updateRecursionLogs()调用
+    
+    // 当用户在页面上活动时更新日志
+    window.addEventListener('focus', updateRecursionLogs);
+    
+    // 添加手动刷新按钮功能
+    const refreshBtn = document.createElement('button');
+    refreshBtn.textContent = '刷新日志';
+    refreshBtn.className = 'refresh-logs-btn';
+    refreshBtn.addEventListener('click', updateRecursionLogs);
+    
+    const recursionHeader = document.querySelector('.recursion-header');
+    if (recursionHeader) {
+        recursionHeader.appendChild(refreshBtn);
+    }
+    
+    // 自动执行测试
+      testChatResponse();
+    console.log('页面加载初始化完成')
 });

@@ -1,6 +1,91 @@
 import uuid
+import json
 import sys
 import os
+# 确保Annotated在全局命名空间中可用
+try:
+    from typing import Annotated
+except ImportError:
+    try:
+        from typing_extensions import Annotated
+    except ImportError:
+        # 如果两者都不可用，定义一个简单的模拟版本
+        class Annotated:
+            def __class_getitem__(cls, item):
+                return item
+# 将Annotated添加到全局命名空间
+__builtins__['Annotated'] = Annotated
+
+# 确保ArgsSchema在全局命名空间中可用
+try:
+    from langchain_core.pydantic_v1 import ArgsSchema
+except ImportError:
+    try:
+        from pydantic import BaseModel as ArgsSchema
+    except ImportError:
+        # 如果都不可用，定义一个简单的模拟版本
+        class ArgsSchema:
+            pass
+# 将ArgsSchema添加到全局命名空间
+__builtins__['ArgsSchema'] = ArgsSchema
+
+# 确保SkipValidation在全局命名空间中可用
+try:
+    from langchain_core.pydantic_v1 import SkipValidation
+except ImportError:
+    try:
+        from pydantic import SkipValidation
+    except ImportError:
+        # 如果都不可用，定义一个简单的模拟版本
+        class SkipValidation:
+            def __class_getitem__(cls, item):
+                return item
+# 将SkipValidation添加到全局命名空间
+__builtins__['SkipValidation'] = SkipValidation
+
+# 确保Optional在全局命名空间中可用
+try:
+    from typing import Optional
+except ImportError:
+    # 如果不可用，定义一个简单的模拟版本
+    class Optional:
+        def __class_getitem__(cls, item):
+            return item
+# 将Optional添加到全局命名空间
+__builtins__['Optional'] = Optional
+
+# 确保Callable在全局命名空间中可用
+try:
+    from typing import Callable
+except ImportError:
+    # 如果不可用，定义一个简单的模拟版本
+    class Callable:
+        def __class_getitem__(cls, item):
+            return item
+# 将Callable添加到全局命名空间
+__builtins__['Callable'] = Callable
+
+# 确保Any在全局命名空间中可用
+try:
+    from typing import Any
+except ImportError:
+    # 如果不可用，定义一个简单的模拟版本
+    class Any:
+        pass
+# 将Any添加到全局命名空间
+__builtins__['Any'] = Any
+
+# 确保Awaitable在全局命名空间中可用
+try:
+    from typing import Awaitable
+except ImportError:
+    # 如果不可用，定义一个简单的模拟版本
+    class Awaitable:
+        def __class_getitem__(cls, item):
+            return item
+# 将Awaitable添加到全局命名空间
+__builtins__['Awaitable'] = Awaitable
+
 from flask import Blueprint, render_template, request, jsonify, session
 from .utils import recursion_logger, load_sessions, load_session_history, save_session_history, delete_session
 from functools import wraps
@@ -28,7 +113,12 @@ def init_agent():
     # 初始化环境变量
     config.langsmith_config.init_env()
     
-    # 将递归日志器绑定到智能体
+    # 使用装饰器包装工具函数以记录工具调用
+    from .utils import RecursionLogger
+    log_tool_call = RecursionLogger.log_tool_call
+    
+    # 注意：我们不再包装工具函数，因为它们已经被@tool装饰器处理
+    # 直接使用原始工具函数
     agent = Langgraph_Agent(
         config.llm_model,
         tools=[list_files, read_file, write_file, run_cmd],
@@ -38,7 +128,6 @@ def init_agent():
     
     # 使用装饰器包装invoke方法以记录递归调用
     if not hasattr(agent.invoke, '_wrapped'):
-        from .utils import RecursionLogger
         agent.invoke = RecursionLogger.log_recursion(agent.invoke)
 
 @main_bp.before_request
@@ -229,7 +318,46 @@ def continue_from_history():
 @main_bp.route('/get_recursion_logs', methods=['GET'])
 def get_recursion_logs():
     """获取递归调用日志"""
-    return jsonify(recursion_logger.get_logs())
+    print("处理递归日志请求")
+    logs = recursion_logger.get_logs()
+    print(f"返回 {len(logs)} 条递归日志")
+    return jsonify({'logs': logs})
+
+# 确保测试递归日志路由正确注册
+@main_bp.route('/test_recursion_logs', methods=['GET'])
+def test_recursion_logs():
+    """测试递归日志生成"""
+    print("测试递归日志生成")
+    # 清除现有日志
+    recursion_logger.clear_logs()
+    
+    # 手动添加一些测试日志，添加source字段
+    recursion_logger.log('call', 'test_function', 'param1=value1, param2=value2', source='TestAgent')
+    recursion_logger.log('result', 'test_function', None, '测试结果成功', source='TestAgent')
+    
+    # 模拟递归调用
+    def test_function(level=0):
+        # 记录日志，添加source字段
+        recursion_logger.log('START', 'test_function', params={'level': level}, source='TestAgent')
+        
+        if level < 2:
+            result = test_function(level + 1)
+        else:
+            result = f"递归级别 {level} 完成"
+        
+        # 记录日志，添加source字段
+        recursion_logger.log('END', 'test_function', result=result, source='TestAgent')
+        
+        return result
+    
+    # 执行测试函数
+    try:
+        test_function()
+    except Exception as e:
+        # 记录错误日志，添加source字段
+        recursion_logger.log('ERROR', 'test_function', result=str(e), source='TestAgent')
+    
+    return jsonify({'status': 'success', 'message': '已添加测试递归日志'})
 
 @main_bp.route('/delete_session', methods=['POST'])
 def delete_session_route():
@@ -291,3 +419,4 @@ def rename_session():
             return jsonify({'success': True, 'message': '会话重命名成功', 'new_session_id': new_session_name})
     except Exception as e:
         return jsonify({'success': False, 'message': f'重命名失败: {str(e)}'}), 500
+

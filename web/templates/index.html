@@ -11,6 +11,63 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js/styles/atom-one-dark.min.css">
     <!-- 引入自定义样式 -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        /* 递归调用日志的样式 */
+        .recursion-log {
+            position: relative;
+        }
+        .recursion-log::before {
+            content: attr(data-source);
+            position: absolute;
+            top: 5px;
+            right: 10px;
+            font-size: 12px;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-weight: bold;
+        }
+        
+        /* 不同来源对象的颜色样式 */
+        .recursion-log.source-Agent {
+            border-left-color: #4285f4;
+        }
+        .recursion-log.source-Agent::before {
+            background-color: #4285f4;
+            color: white;
+        }
+        
+        .recursion-log.source-Tool {
+            border-left-color: #0f9d58;
+        }
+        .recursion-log.source-Tool::before {
+            background-color: #0f9d58;
+            color: white;
+        }
+        
+        .recursion-log.source-LLM {
+            border-left-color: #f4b400;
+        }
+        .recursion-log.source-LLM::before {
+            background-color: #f4b400;
+            color: white;
+        }
+        
+        .recursion-log.source-Database {
+            border-left-color: #db4437;
+        }
+        .recursion-log.source-Database::before {
+            background-color: #db4437;
+            color: white;
+        }
+        
+        .recursion-log.source-Default {
+            border-left-color: #6c757d;
+        }
+        .recursion-log.source-Default::before {
+            background-color: #6c757d;
+            color: white;
+        }
+    </style>
 </head>
 <body>
     <div class="container">
@@ -98,5 +155,106 @@
     
     <!-- 引入自定义脚本 -->
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script>
+        // 获取来源对应的类名
+        function getSourceClassName(source) {
+            if (!source) return 'Default';
+            
+            // 预定义的来源类型映射到CSS类名
+            const sourceMap = {
+                'Agent': 'Agent',
+                'Tool': 'Tool',
+                'LLM': 'LLM',
+                'Database': 'Database',
+                'User': 'User',
+                'Assistant': 'Assistant'
+            };
+            
+            // 检查是否是预定义的来源类型
+            for (const [key, value] of Object.entries(sourceMap)) {
+                if (source.includes(key) || key.includes(source)) {
+                    return value;
+                }
+            }
+            
+            // 如果来源名称包含类名，提取类名（去除可能的模块前缀）
+            const className = source.split('.').pop();
+            return sourceMap[className] || 'Default';
+        }
+        
+        // 更新递归调用日志显示
+        function updateRecursionLogs(logs) {
+            const logsContainer = document.getElementById('recursion-logs');
+            if (!logs || logs.length === 0) {
+                logsContainer.innerHTML = '<h3>递归调用日志</h3><p>暂无递归调用记录...</p>';
+                return;
+            }
+            
+            let logsHtml = '<h3>递归调用日志</h3>';
+            logs.forEach(log => {
+                // 获取来源显示名称和CSS类名
+                const sourceName = log.source || '未知';
+                const sourceClass = getSourceClassName(sourceName);
+                
+                logsHtml += `
+                <div class="recursion-log ${log.level.toLowerCase()} source-${sourceClass}" data-source="${sourceName}">
+                    <p class="timestamp">${log.timestamp}</p>
+                    <p class="function">${log.function}</p>
+                    ${log.params ? `<p class="params">参数: ${JSON.stringify(log.params)}</p>` : ''}
+                    ${log.result ? `<p class="result">结果: ${log.result}</p>` : ''}
+                </div>
+                `;
+            });
+            logsContainer.innerHTML = logsHtml;
+        }
+        
+        // 优化递归日志显示功能
+        document.addEventListener('DOMContentLoaded', function() {
+            // 存储上一次的日志数量，避免不必要的更新
+            let lastLogCount = 0;
+            
+            // 定期获取递归日志
+            function fetchRecursionLogs() {
+                fetch('/get_recursion_logs')
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.logs) {
+                            // 只有当日志数量发生变化时才更新，减少闪烁
+                            if (data.logs.length !== lastLogCount) {
+                                updateRecursionLogs(data.logs);
+                                lastLogCount = data.logs.length;
+                            }
+                        }
+                    })
+                    .catch(error => console.error('获取递归日志失败:', error));
+            }
+            
+            // 初始获取一次
+            fetchRecursionLogs();
+            
+            // 减少刷新频率，从每秒一次改为每3秒一次，减少闪烁
+            setInterval(fetchRecursionLogs, 3000);
+            
+            // 确保聊天历史自动滚动到底部，避免被输入框遮挡
+            function scrollToBottom() {
+                const chatHistory = document.getElementById('chat-history');
+                if (chatHistory) {
+                    chatHistory.scrollTop = chatHistory.scrollHeight;
+                }
+            }
+            
+            // 初始滚动到底部
+            scrollToBottom();
+            
+            // 监听聊天表单提交，发送消息后滚动到底部
+            const chatForm = document.getElementById('chat-form');
+            if (chatForm) {
+                chatForm.addEventListener('submit', function() {
+                    // 短暂延迟确保新消息已添加
+                    setTimeout(scrollToBottom, 100);
+                });
+            }
+        });
+    </script>
 </body>
 </html>

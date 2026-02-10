@@ -1,6 +1,6 @@
 import os
 from flask import Flask
-from .utils import RecursionLogger
+from .utils import recursion_logger
 from .routes import main_bp
 
 # 初始化Flask应用
@@ -14,9 +14,6 @@ app.config['SESSION_TYPE'] = 'filesystem'
 def ensure_directories():
     os.makedirs('./data', exist_ok=True)
     os.makedirs('./data/memory', exist_ok=True)
-
-# 初始化递归日志器
-recursion_logger = RecursionLogger()
 
 # 注册蓝图
 app.register_blueprint(main_bp)
